@@ -1,0 +1,5 @@
+faces/*
+venv/
+.vscode/
+__pycache__/
+test.yaml
