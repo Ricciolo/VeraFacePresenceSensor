@@ -1,0 +1,34 @@
+<root xmlns="urn:schemas-upnp-org:device-1-0">
+	<specVersion>
+		<major>1</major>
+		<minor>5</minor>
+	</specVersion>
+	<device>
+		<deviceType>urn:schemas-ricciolo:device:PresenceSensor:1</deviceType>
+		<staticJson>D_FacePresenceSensor.json</staticJson>
+		<friendlyName>Face Presence Sensor</friendlyName>
+		<manufacturer>Ricciolo</manufacturer>
+		<protocol>cr</protocol>
+		<handleChildren>0</handleChildren>
+		<serviceList>
+			<service>
+				<serviceType>urn:schemas-ricciolo:service:PresenceSensor:1</serviceType>
+				<serviceId>urn:ricciolo:serviceId:PresenceSensor1</serviceId>
+				<SCPDURL>S_FacePresenceSensor.xml</SCPDURL>
+			</service>
+			<service>
+				<serviceType>urn:schemas-micasaverde-com:service:SecuritySensor:1</serviceType>
+				<serviceId>urn:micasaverde-com:serviceId:SecuritySensor1</serviceId>
+				<SCPDURL>S_SecuritySensor1.xml</SCPDURL>
+			</service>
+			<service>
+				<serviceType>urn:schemas-upnp-org:service:SwitchPower:1</serviceType>
+				<serviceId>urn:upnp-org:serviceId:SwitchPower1</serviceId>
+				<SCPDURL>S_SwitchPower1.xml</SCPDURL>
+			</service>
+		</serviceList>
+		<implementationList>
+			<implementationFile>I_FacePresenceSensor.xml</implementationFile>
+		</implementationList>
+	</device>
+</root>

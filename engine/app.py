@@ -4,7 +4,7 @@ from os.path import isfile, join, splitext
 import face_recognition
 
 import yaml
-from camera import Camera
+from camera import Camera, JpegCamera, CameraConfiguration, MjpegCamera, GlobalConfiguration
 
 # Global storage for images
 faces_dict = {}
@@ -58,7 +58,7 @@ if __name__ == "__main__":
             print("Cannot parse " + config_file + " file")
             exit(-1)
 
-    print("Processing faces...")
+    print("\nProcessing faces...")
     # Calculate known faces    
     dir = environ.get("FACES_PATH", "faces")
     faces_dict = get_faces_dict(dir)    
@@ -69,12 +69,18 @@ if __name__ == "__main__":
     else:
         print("Found %s faces" % len(faces_dict))
 
-    threshold = float(config.get("threshold", 0.05))
+    print("")
+
+    globalConfiguration = GlobalConfiguration(config.get("veraIP"), float(config.get("threshold", 0.05)), faces_dict)
 
     # Start cameras
     cameras = []
     for c in config.get("cameras", []):
-        c = Camera(threshold, faces_dict, c["url"], c.get("username"), c.get("password"))
+        config = CameraConfiguration(float(c.get("fps", 1)), c["url"], c.get("username"), c.get("password"), c.get("deviceId", 1))
+        if c.get("type") == "mjpeg":        
+            c = MjpegCamera(globalConfiguration, config)
+        else:
+            c = JpegCamera(globalConfiguration, config)
         cameras.append(c)    
-
-        c.start_loop()
+        print("Starting camera %s..." % config.url)
+        c.start()

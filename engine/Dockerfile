@@ -34,9 +34,9 @@ RUN cd ~ && \
     python3 setup.py install --yes USE_AVX_INSTRUCTIONS
 
 
-# Install Flask
+# Install other dependencies
 RUN cd ~ && \
-    pip3 install flask flask-cors
+    pip3 install pyyaml opencv-python
 
 
 # Install Face-Recognition Python Library
@@ -47,11 +47,9 @@ RUN cd ~ && \
     pip3 install -r requirements.txt && \
     python3 setup.py install
 
-
 # Copy web service script
-COPY facerec_service.py /root/facerec_service.py
-
+WORKDIR /root
+COPY . .
 
 # Start the web service
-CMD cd /root/ && \
-    python3 facerec_service.py
+CMD python3 -u app.py

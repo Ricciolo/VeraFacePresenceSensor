@@ -1,6 +1,0 @@
-threshold: 0.03
-cameras:
-  - url: http://....
-#   username: 
-#   password: 
-    deviceId: 120

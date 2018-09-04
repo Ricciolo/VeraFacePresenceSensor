@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<scpd xmlns="urn:schemas-upnp-org:service-1-0">
+	<specVersion>
+		<major>1</major>
+		<minor>5</minor>
+	</specVersion>
+	<actionList>		
+		<action>
+			<name>SetPresent</name>
+			<argumentList>
+				<argument>
+					<name>newPresentValue</name>
+					<direction>in</direction>
+					<relatedStateVariable>Present</relatedStateVariable>
+				</argument>
+			</argumentList>
+		</action>
+	</actionList>
+	<serviceStateTable>
+		<stateVariable>
+			 <sendEventsAttribute>no</sendEventsAttribute>
+			 <name>TimeWindow</name>
+			 <dataType>string</dataType>
+			 <defaultValue>5</defaultValue>
+		</stateVariable>		
+		<stateVariable>
+			 <sendEventsAttribute>no</sendEventsAttribute>
+			 <name>Present</name>
+			 <dataType>string</dataType>
+			 <defaultValue>no</defaultValue>
+		</stateVariable>
+	</serviceStateTable>
+</scpd>

@@ -1,0 +1,19 @@
+threshold: 0.03
+# Vera IP
+veraIP: 192.168.1.1
+cameras:
+  - url: http://....
+    
+    # optional username for basic authentication
+    # username:
+    
+    # optional password for basic authentication
+    # password:
+    # jpeg or mjpeg supported
+    type: jpeg
+
+    # frames per seconds to analyze
+    fps: 2
+
+    # virtual device id on Vera
+    deviceId: 1
