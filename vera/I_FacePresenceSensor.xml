@@ -77,7 +77,7 @@
 
 		local function setTripped(parentDevice, status)
 			timeWindow, enable = readSettings(parentDevice)
-			if not enable then
+			if enable == "0" then
 				return
 			end
 
@@ -85,19 +85,19 @@
 			local time = os.time(os.date('*t'))
 			if string.len(status) > 0 then
 				tripped = "1"
-				luup.call_delay("autoReset", tonumber(timeWindow), parentDevice .. ":" .. time)
+				luup.call_delay("autoReset", tonumber(timeWindow), tostring(parentDevice) .. ":" .. tostring(time))
 			end
 
+			luup.variable_set(HADEVICE_SID, "LastUpdate", time, parentDevice)
 			local origTripped = luup.variable_get(SECURITY_SID, "Tripped", parentDevice) or "0"
-			if (origTripped  ~= tripped) then
+			if (origTripped ~= tripped) then
 				luup.variable_set(SECURITY_SID, "Tripped", tripped, parentDevice)
-				luup.variable_set(HADEVICE_SID, "LastUpdate", time, parentDevice)
-				if ((lul_settings.newPresentValue == "1") and (origTripped == "0")) then
-					luup.variable_set(PRESENCE_SID, "Names", status, parentDevice)
-					luup.variable_set(SECURITY_SID, "LastTrip", time, parentDevice)
-				else
-					luup.variable_set(PRESENCE_SID, "Names", "", parentDevice)
-				end
+			end
+			if (tripped == "1") then
+				luup.variable_set(PRESENCE_SID, "Names", status, parentDevice)
+				luup.variable_set(SECURITY_SID, "LastTrip", time, parentDevice)
+			else
+				luup.variable_set(PRESENCE_SID, "Names", "", parentDevice)
 			end
 		end
 
@@ -111,7 +111,10 @@
 				return array
     		end
 			local s = split(data, ":")
-			setTripped(tonumber(s[1]), s[2])
+			local trip = luup.variable_get(HADEVICE_SID, "LastUpdate", parentDevice)
+			if (tonumber(trip) == tonumber(s[2])) then
+				setTripped(tonumber(s[1]), '')
+			end
 		end
 
 		function main(parentDevice)
