@@ -76,7 +76,7 @@ if __name__ == "__main__":
     # Start cameras
     cameras = []
     for c in config.get("cameras", []):
-        config = CameraConfiguration(float(c.get("fps", 1)), c["url"], c.get("username"), c.get("password"), c.get("deviceId", 1))
+        config = CameraConfiguration(float(c.get("fps", 1)), c["url"], c.get("username"), c.get("password"), c.get("veraDeviceId", 0), c.get('webHook'))
         if c.get("type") == "mjpeg":        
             c = MjpegCamera(globalConfiguration, config)
         else:
@@ -84,3 +84,6 @@ if __name__ == "__main__":
         cameras.append(c)    
         print("Starting camera %s..." % config.url)
         c.start()
+    
+    for c in cameras:
+        c.join()

@@ -7,6 +7,8 @@ import face_recognition
 import time
 import sys
 import urllib.parse
+import json
+from threading import Thread
 
 class GlobalConfiguration:
     def __init__(self, vera_ip: str, threshold: float, faces_dict):
@@ -15,10 +17,11 @@ class GlobalConfiguration:
         self.faces_dict = faces_dict
 
 class CameraConfiguration:
-    def __init__(self, fps: float, url: str, username: str, password: str, deviceId: int):
+    def __init__(self, fps: float, url: str, username: str, password: str, veraDeviceId: int, webHook: str):
         self.url = url
         self.fps = fps
-        self.deviceId = deviceId
+        self.webHook = webHook
+        self.veraDeviceId = veraDeviceId
         self.username = username
         self.password = password
 
@@ -27,8 +30,9 @@ class CameraConfiguration:
             return self.url.replace("http://", "http://%s:%s@" % (urllib.request.quote(self.username), urllib.request.quote(self.password)))
         return self.url
 
-class Camera:
+class Camera (Thread):
     def __init__(self, globalConfiguration: GlobalConfiguration, configuration: CameraConfiguration):
+        Thread.__init__(self)
         self.configuration = configuration
         self.globalConfiguration = globalConfiguration
         self.lastFrame = 0.0
@@ -40,9 +44,24 @@ class Camera:
             frame = cv.imdecode(frame, cv.IMREAD_COLOR)
         else:
             frame = frame_data
-        
+       
         # Resize frame of video to 1/4 size for faster face recognition processing
-        small_frame = cv.resize(frame, (0, 0), fx=0.25, fy=0.25)
+        width = frame.shape[1]
+        height = frame.shape[0]
+        maxWidth = 640
+        maxHeight = 480
+        if width > maxWidth or height > maxHeight:
+            if (width > height):
+                h = int(maxWidth * height / width)
+                w = maxWidth
+            else:
+                w = int(maxHeight * width / height)
+                h = maxHeight
+            small_frame = cv.resize(frame, (w, h))
+        else:
+            small_frame = frame
+
+        cv.imwrite('/home/ricciolo/Downloads/test.jpg', small_frame)
 
         # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
         rgb_small_frame = small_frame[:, :, ::-1]
@@ -72,21 +91,45 @@ class Camera:
 
         return faces_found, faces
     
-    def call_vera(self, ids):
-        ids = ",".join(ids)
-        uri = "http://%s:3480/data_request?id=action&output_format=json&DeviceNum=%s&serviceId=urn:ricciolo:serviceId:PresenceSensor1&action=SetPresent&newPresentValue=%s" %(self.globalConfiguration.vera_ip, self.configuration.deviceId, ids)
+    def callback(self, ids):
+        if self.configuration.veraDeviceId:
+            ids = ",".join(ids)
+            self.http_get("http://%s:3480/data_request?id=action&output_format=json&DeviceNum=%s&serviceId=urn:ricciolo:serviceId:PresenceSensor1&action=SetPresent&newPresentValue=%s" %(self.globalConfiguration.vera_ip, self.configuration.veraDeviceId, ids))
+
+        if self.configuration.webHook:
+            self.http_post(self.configuration.webHook, {
+                "camera": self.configuration.url,
+                "names": ids
+            })
+        
+    
+    def http_get(self, uri):
+        print('Calling %s' % uri)
         request = urllib.request.Request(uri)
         try:
             stream = urllib.request.urlopen(request)
+            print('Received %s' % stream.status)
+        finally:
+            stream.close()
+
+    def http_post(self, uri, data):
+        print('Calling %s' % uri)
+        request = urllib.request.Request(uri)
+        request.add_header('Content-Type', 'application/json; charset=utf-8')
+        jsondata = json.dumps(data)
+        jsondataasbytes = jsondata.encode('utf-8')
+        request.add_header('Content-Length', len(jsondataasbytes))
+        try:
+            stream = urllib.request.urlopen(request, jsondataasbytes)
+            print('Received %s' % stream.status)
         finally:
             stream.close()
     
-    def start(self):
+    def run(self):
         while True:
             diff = time.time() - self.lastFrame
             if diff < 1 / self.configuration.fps:
-                self.skip_frame()
-                time.sleep(1 / self.configuration.fps * diff)
+                self.skip_frame(1 / self.configuration.fps * diff)
                 continue
             
             self.lastFrame = time.time()
@@ -96,11 +139,10 @@ class Camera:
 
                 if (faces_found):
                     for f in faces:
-                        print("%s: %s" % (f["id"], f["dist"]))
-                    self.call_vera(map(lambda f: f["id"], faces))
+                        print("%s: %s" % (f["id"], f["dist"]))                    
                         
-                    #for f in filter(lambda f: float(f["dist"]) >= self.configuration.threshold, faces):
-                    #    print("%s: %s" % (f["id"], f["dist"]))
+                    for f in filter(lambda f: float(f["dist"]) >= self.globalConfiguration.threshold, faces):
+                        self.callback(list(map(lambda f: f["id"], faces)))
             except:
                 # print("Unexpected error:", sys.exc_info()[0])
                 pass
@@ -108,20 +150,20 @@ class Camera:
     def get_frame(self):
         pass
     
-    def skip_frame(self):
+    def skip_frame(self, seconds):
         pass
 
 class JpegCamera(Camera):
     def __init__(self, globalConfiguration: GlobalConfiguration, configuration: CameraConfiguration):
         Camera.__init__(self, globalConfiguration, configuration)
 
-    def start(self):
+    def run(self):
         self.request = urllib.request.Request(self.configuration.url)
         if self.configuration.username and self.configuration.password:
             base64string = base64.encodestring(("%s:%s" % (self.configuration.username, self.configuration.password)).encode()).decode().replace("\n", "")
             self.request.add_header("Authorization", "Basic %s" % base64string)
 
-        super().start()
+        super().run()
 
     def get_frame(self):
         try:
@@ -129,6 +171,9 @@ class JpegCamera(Camera):
             return stream.read(), True
         finally:
             stream.close()
+
+    def skip_frame(self, seconds):
+        time.sleep(seconds)
 
 class MjpegCamera(Camera):
     def __init__(self, globalConfiguration: GlobalConfiguration, configuration: CameraConfiguration):
@@ -142,21 +187,22 @@ class MjpegCamera(Camera):
             return False
         return True
 
-    def start(self):
+    def run(self):
         if not self.createVideo():
             return
 
-        super().start()
+        super().run()
     
     def get_frame(self):
         ret, frame = self.video.read()
         if not ret:
             self.video.release()
             self.createVideo()
-        #else:
-        #    print("Frame")
 
         return frame, False
 
-    def skip_frame(self):
-        self.video.grab()
+    def skip_frame(self, seconds):
+        start = time.time()
+        seconds -= 0.05
+        while self.video.grab() and (time.time() - start) < seconds:
+            pass

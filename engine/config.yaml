@@ -15,5 +15,8 @@ cameras:
     # frames per seconds to analyze
     fps: 2
 
-    # virtual device id on Vera
-    deviceId: 1
+    # virtual device id on Vera (optional)
+    veraDeviceId: 1
+
+    # HTTP uri to call in POST (optional)
+    webHook:
