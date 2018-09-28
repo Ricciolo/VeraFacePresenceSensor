@@ -1,4 +1,4 @@
-threshold: 0.03
+threshold: 0.5 # values near to 0 means more accurancy
 # Vera IP
 veraIP: 192.168.1.1
 cameras:

@@ -8,7 +8,8 @@ import time
 import sys
 import urllib.parse
 import json
-from threading import Thread
+import datetime
+from threading import Thread, Lock
 
 class GlobalConfiguration:
     def __init__(self, vera_ip: str, threshold: float, faces_dict):
@@ -61,7 +62,7 @@ class Camera (Thread):
         else:
             small_frame = frame
 
-        cv.imwrite('/home/ricciolo/Downloads/test.jpg', small_frame)
+        # cv.imwrite('/home/ricciolo/Downloads/test.jpg', small_frame)
 
         # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
         rgb_small_frame = small_frame[:, :, ::-1]
@@ -104,16 +105,19 @@ class Camera (Thread):
         
     
     def http_get(self, uri):
-        print('Calling %s' % uri)
+        self.log('Calling %s' % uri)
         request = urllib.request.Request(uri)
         try:
             stream = urllib.request.urlopen(request)
-            print('Received %s' % stream.status)
+            self.log('Received %s' % stream.status)
         finally:
             stream.close()
+    
+    def log(self, msg):
+        print("%s - %s" % (datetime.datetime.now(), msg))
 
     def http_post(self, uri, data):
-        print('Calling %s' % uri)
+        self.log('Calling %s' % uri)
         request = urllib.request.Request(uri)
         request.add_header('Content-Type', 'application/json; charset=utf-8')
         jsondata = json.dumps(data)
@@ -121,7 +125,7 @@ class Camera (Thread):
         request.add_header('Content-Length', len(jsondataasbytes))
         try:
             stream = urllib.request.urlopen(request, jsondataasbytes)
-            print('Received %s' % stream.status)
+            self.log('Received %s' % stream.status)
         finally:
             stream.close()
     
@@ -139,10 +143,12 @@ class Camera (Thread):
 
                 if (faces_found):
                     for f in faces:
-                        print("%s: %s" % (f["id"], f["dist"]))                    
+                        self.log("%s: %s" % (f["id"], f["dist"]))                    
                         
-                    for f in filter(lambda f: float(f["dist"]) >= self.globalConfiguration.threshold, faces):
+                    for f in filter(lambda f: float(f["dist"]) <= self.globalConfiguration.threshold, faces):
                         self.callback(list(map(lambda f: f["id"], faces)))
+                    
+                    print("")
             except:
                 # print("Unexpected error:", sys.exc_info()[0])
                 pass
@@ -178,23 +184,15 @@ class JpegCamera(Camera):
 class MjpegCamera(Camera):
     def __init__(self, globalConfiguration: GlobalConfiguration, configuration: CameraConfiguration):
         Camera.__init__(self, globalConfiguration, configuration)
-        self.uri = self.configuration.get_credentials_uri()
-
-    def createVideo(self):
-        self.video = cv.VideoCapture()
-        if not self.video.open(self.uri):
-            print("Cannot open uri %s" % self.uri)
-            return False
-        return True
+        self.loop = MjpegCameraLoop(self.configuration.get_credentials_uri())
 
     def run(self):
-        if not self.createVideo():
-            return
-
+        self.loop.start()
+        self.loop.wait_ready()
         super().run()
     
     def get_frame(self):
-        ret, frame = self.video.read()
+        ret, frame = self.loop.get_frame()
         if not ret:
             self.video.release()
             self.createVideo()
@@ -202,7 +200,40 @@ class MjpegCamera(Camera):
         return frame, False
 
     def skip_frame(self, seconds):
-        start = time.time()
-        seconds -= 0.05
-        while self.video.grab() and (time.time() - start) < seconds:
-            pass
+        time.sleep(seconds)
+
+class MjpegCameraLoop (Thread):    
+    def __init__(self, uri):
+        Thread.__init__(self)
+        self.ready = Lock()
+        self.ready.acquire()
+        self.uri = uri
+
+    def createVideo(self):
+        self.video = cv.VideoCapture()
+        if not self.video.open(self.uri):
+            print("Cannot open uri %s" % self.uri)
+            return False
+        return True
+    
+    def wait_ready(self):
+        self.ready.acquire()
+        self.ready.release()
+
+    def run(self):
+        while True:
+            if not self.createVideo():
+                time.sleep(1)
+                continue
+            try:
+                self.ready.release()
+            except:
+                pass
+
+            while self.video.grab():
+                pass
+
+            self.video.release()
+
+    def get_frame(self):
+        return self.video.retrieve()
