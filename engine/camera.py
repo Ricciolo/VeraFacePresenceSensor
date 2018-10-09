@@ -141,7 +141,7 @@ class Camera (Thread):
                 img, raw = self.get_frame()
                 faces_found, faces = self.detect_faces_in_image(img, raw)
 
-                if (faces_found):
+                if (faces_found and len(faces) > 0):
                     for f in faces:
                         self.log("%s: %s" % (f["id"], f["dist"]))                    
                         
